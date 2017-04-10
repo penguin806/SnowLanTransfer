@@ -19,11 +19,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{68F1CB13-193E-465B-9342-DE11529D969A}</ProjectGuid>
+    <ProjectGuid>{218466A6-878E-4B37-A5A3-A73621B84881}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>SnowLanTransfer</RootNamespace>
+    <RootNamespace>Server_SnowLanTransfer</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
-    <ProjectName>Server_SnowLanTransfer</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
