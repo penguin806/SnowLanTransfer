@@ -25,10 +25,12 @@ INT InitNetwork()
 		return INVALID_SOCKET;
 	}
 
+	int error = WSAGetLastError();
+
 	SOCKADDR_IN BindAddress;
 	ZeroMemory(&BindAddress, sizeof(BindAddress));
 	BindAddress.sin_family = AF_INET;
-	BindAddress.sin_addr.S_un.S_addr = htonl(INADDR_ANY);
+	BindAddress.sin_addr.S_un.S_addr = INADDR_ANY;
 	BindAddress.sin_port = htons(2017);
 
 	iResult = bind(Sock, (const sockaddr*)&BindAddress, sizeof(BindAddress));
@@ -38,6 +40,8 @@ INT InitNetwork()
 		WSACleanup();
 		return INVALID_SOCKET;
 	}
+
+	int error2 = WSAGetLastError();
 
 	return Sock;
 }
@@ -50,20 +54,18 @@ DWORD WINAPI NetThreadProc(LPVOID lParam)
 		return 0;
 	}
 	THREAD_DATA dataPassed = *((THREAD_DATA *)lParam);
-	TCHAR szBuffer[BUFFER_LEN];
-	INT iResult, iLength = 0;
+	TCHAR szBuffer[BUFFER_LEN + 1];
+	INT iResult, iLength = sizeof(SOCKADDR_IN);
 	SOCKADDR_IN IncomingAddr;
 	ZeroMemory(&IncomingAddr, sizeof(IncomingAddr));
 
-
-	int temp[5000] = { 0 };
-	int i = 0;
 	while (TRUE)
 	{
 		ZeroMemory(szBuffer, sizeof(szBuffer));
 		iResult = recvfrom(dataPassed.Sock, (CHAR*)szBuffer, sizeof(szBuffer) - 2, 0,
 			(sockaddr*)&IncomingAddr, &iLength);
 
+		//int error = WSAGetLastError();
 		if (iResult > 0)
 		{
 			MessageBox(NULL, szBuffer, 0, 0);
