@@ -10,7 +10,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 	INT Sock;
 
 	Sock = InitNetwork();
-	if (Sock == INVALID_SOCKET)
+	if (Sock == INVALID_SOCKET || Sock == 0)
 	{
 		MessageBox(NULL, TEXT("Windows Socket Init Fail!"), TEXT("Fatal Error"),
 			MB_OK | MB_ICONERROR);

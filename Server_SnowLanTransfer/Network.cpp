@@ -28,6 +28,7 @@ INT InitNetwork()
 	if (iResult != 0)
 	{
 		closesocket(Sock);
+		WSACleanup();
 		return INVALID_SOCKET;
 	}
 
