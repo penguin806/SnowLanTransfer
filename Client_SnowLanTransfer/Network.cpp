@@ -57,6 +57,7 @@ DWORD WINAPI NetThreadProc(LPVOID lParam)
 	TCHAR szBuffer[BUFFER_LEN + 1];
 	INT iResult, iLength = sizeof(SOCKADDR_IN);
 	SOCKADDR_IN IncomingAddr;
+
 	ZeroMemory(&IncomingAddr, sizeof(IncomingAddr));
 
 	while (TRUE)
@@ -66,15 +67,61 @@ DWORD WINAPI NetThreadProc(LPVOID lParam)
 			(sockaddr*)&IncomingAddr, &iLength);
 
 		//int error = WSAGetLastError();
-		if (iResult > 0)
-		{
-			MessageBox(NULL, szBuffer, 0, 0);
-		}
+		ParseData(dataPassed.hOutput, szBuffer, iResult, IncomingAddr.sin_addr);
 	}
 
 	return 0;
 }
 
+VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress)
+{
+	TCHAR *szDisplayBuffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 60);
+	TCHAR *szDisplayBufferB = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 60);
+	GetWindowText(hOutput, szDisplayBuffer, BUFFER_LEN * 30);
+
+	if (RecvSize != BUFFER_LEN * 2)
+	{
+		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nData Error\r\n"), szDisplayBuffer,
+			inet_ntoa(fromAddress));
+		SetWindowText(hOutput, szDisplayBufferB);
+		return;
+	}
+	
+	TCHAR szType[6] = { 0 }, szBuffer[BUFFER_LEN] = { 0 }, *p = szDataRecv;
+	for (int i = 0; i < 5; i++)
+		szType[i] = *p++;
+
+	for (int i = 0; *p && p < szDataRecv + BUFFER_LEN; i++, p++)
+	{
+		szBuffer[i] = *p;
+	}
+
+	if (lstrcmp(szType, TEXT("#Sen#")) == 0)
+	{
+		LPWSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
+		wsprintf(szDisplayBufferB, TEXT("%s[%s] Message:\r\n%s\r\n"), szDisplayBuffer,
+			UnicodeIpAddr, szBuffer);
+		free(UnicodeIpAddr);
+
+		SetWindowText(hOutput, szDisplayBufferB);
+	}
+	else if (lstrcmp(szType, TEXT("#Dow#")) == 0)
+	{
+
+	}
+	else if (lstrcmp(szType, TEXT("#Exe#")) == 0)
+	{
+		
+	}
+	else
+	{
+		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nUnknown Data\r\n"), szDisplayBuffer,
+			inet_ntoa(fromAddress));
+		SetWindowText(hOutput, szDisplayBufferB);
+	}
+	LocalFree(szDisplayBuffer);
+	LocalFree(szDisplayBufferB);
+}
 
 VOID CleanNetwork(INT Sock)
 {
@@ -84,4 +131,16 @@ VOID CleanNetwork(INT Sock)
 	}
 
 	WSACleanup();
+}
+
+// Copy from http://blog.csdn.net/linuxandroidwince/article/details/7527232 2017-04-11
+wchar_t * ANSIToUnicode(const char* str)
+{
+	int textlen;
+	wchar_t * result;
+	textlen = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
+	result = (wchar_t *)malloc((textlen + 1) * sizeof(wchar_t));
+	memset(result, 0, (textlen + 1) * sizeof(wchar_t));
+	MultiByteToWideChar(CP_ACP, 0, str, -1, (LPWSTR)result, textlen);
+	return result;
 }

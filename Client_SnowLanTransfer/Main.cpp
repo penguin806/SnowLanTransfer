@@ -28,7 +28,7 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	switch (uMsg)
 	{
 	case WM_INITDIALOG:
-		DataToPass.hMainWnd = hMainWnd;
+		DataToPass.hOutput = GetDlgItem(hMainWnd, IDC_OUTPUT);
 		DataToPass.Sock = (INT)lParam;
 		hNetThread = CreateThread(NULL, 0, NetThreadProc, &DataToPass, 0, NULL);
 		break;
