@@ -35,7 +35,7 @@ INT InitNetwork()
 	return Sock;
 }
 
-BOOL SendData(INT Sock, ULONG Address, LPWSTR szData, ULONG iDataSize)
+BOOL SendData(INT Sock, ULONG Address, LPTSTR szData, ULONG iDataSize)
 {
 	if (Sock == 0 || Sock == INVALID_SOCKET)
 	{

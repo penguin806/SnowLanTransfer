@@ -1,7 +1,9 @@
 // Snow 2017-04-10
 #include <WinSock2.h>
+#include <UrlMon.h>
 #include "Header.h"
 #pragma comment(lib,"ws2_32.lib")
+#pragma comment(lib, "urlmon.lib")
 
 #define BUFFER_LEN 512
 
@@ -81,9 +83,12 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 
 	if (RecvSize != BUFFER_LEN * 2)
 	{
-		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nData Error\r\n"), szDisplayBuffer,
+		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nNetwork Error\r\n"), szDisplayBuffer,
 			inet_ntoa(fromAddress));
 		SetWindowText(hOutput, szDisplayBufferB);
+
+		LocalFree(szDisplayBuffer);
+		LocalFree(szDisplayBufferB);
 		return;
 	}
 	
@@ -98,7 +103,7 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 
 	if (lstrcmp(szType, TEXT("#Sen#")) == 0)
 	{
-		LPWSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
+		LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
 		wsprintf(szDisplayBufferB, TEXT("%s[%s] Message:\r\n%s\r\n"), szDisplayBuffer,
 			UnicodeIpAddr, szBuffer);
 		free(UnicodeIpAddr);
@@ -107,7 +112,24 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 	}
 	else if (lstrcmp(szType, TEXT("#Dow#")) == 0)
 	{
+		LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
+		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nDownloading: %s\r\n"), szDisplayBuffer,
+			UnicodeIpAddr, szBuffer);
+		free(UnicodeIpAddr);
+		SetWindowText(hOutput, szDisplayBufferB);
 
+		TCHAR szSavedPath[MAX_PATH] = { 0 };
+		if (DownloadFile(szBuffer, szSavedPath) == TRUE)
+		{
+			wsprintf(szDisplayBuffer,
+				TEXT("%sDownload Finish!\r\nSaved to: %s\r\n"),
+				szDisplayBufferB, szSavedPath);
+		}
+		else
+		{
+			wsprintf(szDisplayBuffer, TEXT("%sDownload Fail!\r\n"), szDisplayBufferB);
+		}
+		SetWindowText(hOutput, szDisplayBuffer);
 	}
 	else if (lstrcmp(szType, TEXT("#Exe#")) == 0)
 	{
@@ -115,8 +137,11 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 	}
 	else
 	{
+		LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
 		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nUnknown Data\r\n"), szDisplayBuffer,
-			inet_ntoa(fromAddress));
+			UnicodeIpAddr);
+		free(UnicodeIpAddr);
+
 		SetWindowText(hOutput, szDisplayBufferB);
 	}
 	LocalFree(szDisplayBuffer);
@@ -133,6 +158,55 @@ VOID CleanNetwork(INT Sock)
 	WSACleanup();
 }
 
+VOID ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine)
+{
+	
+}
+
+BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath)
+{
+	TCHAR szFullPath[MAX_PATH] = { 0 };
+	LPTSTR szFileName = ParseFilenameFromUrl(lpCmdLine);
+
+	GetTempPath(MAX_PATH, szFullPath);
+	lstrcat(szFullPath, szFileName);
+	LocalFree(szFileName);
+
+	LRESULT lResult = URLDownloadToFile(NULL, lpCmdLine, szFullPath, 0, NULL);
+	if (lResult == S_OK)
+	{
+		lstrcpy(szSavePath, szFullPath);
+		return TRUE;
+	}
+	else
+	{
+		return FALSE;
+	}
+}
+
+LPTSTR ParseFilenameFromUrl(const LPTSTR szUrl)
+{
+	TCHAR *szFileName = 
+		(TCHAR *)LocalAlloc(LMEM_ZEROINIT, sizeof(TCHAR)*MAX_PATH);
+
+	TCHAR *p = szUrl, *q = szFileName;
+	for (; *p && p < szUrl + MAX_PATH; p++);
+
+	while (p > szUrl && *p != TEXT('/'))
+	{
+		p--;
+	}
+	p++;
+	
+	while (*p && p < szUrl + MAX_PATH)
+	{
+		*q++ = *p++;
+	}
+	*q = 0;
+
+	return szFileName;
+}
+
 // Copy from http://blog.csdn.net/linuxandroidwince/article/details/7527232 2017-04-11
 wchar_t * ANSIToUnicode(const char* str)
 {
@@ -141,6 +215,7 @@ wchar_t * ANSIToUnicode(const char* str)
 	textlen = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
 	result = (wchar_t *)malloc((textlen + 1) * sizeof(wchar_t));
 	memset(result, 0, (textlen + 1) * sizeof(wchar_t));
-	MultiByteToWideChar(CP_ACP, 0, str, -1, (LPWSTR)result, textlen);
+	MultiByteToWideChar(CP_ACP, 0, str, -1, (LPTSTR)result, textlen);
 	return result;
 }
+

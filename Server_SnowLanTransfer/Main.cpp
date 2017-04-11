@@ -26,7 +26,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	static INT Sock;
-	const LPWSTR szComboText[OPTION_NUM] = {
+	const LPTSTR szComboText[OPTION_NUM] = {
 		TEXT("Execute Command"),
 		TEXT("Download File"),
 		TEXT("Send Message")

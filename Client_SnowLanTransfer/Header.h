@@ -12,5 +12,8 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 INT InitNetwork();
 DWORD WINAPI NetThreadProc(LPVOID lParam);
 VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress);
+LPTSTR ParseFilenameFromUrl(const LPTSTR szUrl);
+VOID ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine);
+BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath);
 VOID CleanNetwork(INT Sock);
 wchar_t * ANSIToUnicode(const char* str);
