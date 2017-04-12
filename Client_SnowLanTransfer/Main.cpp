@@ -38,6 +38,7 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		case IDCANCEL:
 			TerminateThread(hNetThread, 0);
 			CloseHandle(hNetThread);
+			Sleep(500);
 			CleanNetwork(DataToPass.Sock);
 			EndDialog(hMainWnd, 0);
 			break;

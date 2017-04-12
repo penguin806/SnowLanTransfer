@@ -27,9 +27,9 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 {
 	static INT Sock;
 	const LPTSTR szComboText[OPTION_NUM] = {
-		TEXT("Execute Command"),
+		TEXT("Send Message"),
 		TEXT("Download File"),
-		TEXT("Send Message")
+		TEXT("Execute Command")
 	};
 
 	switch (uMsg)
@@ -40,10 +40,10 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		for (int i = 0; i < OPTION_NUM; i++)
 		{
 			SendDlgItemMessage(hMainWnd, IDC_COMBO1, CB_INSERTSTRING,
-				0, (LPARAM)szComboText[i]);
+				-1, (LPARAM)szComboText[i]);
 		}
 		SendDlgItemMessage(hMainWnd, IDC_COMBO1, CB_SELECTSTRING,
-			-1, (LPARAM)szComboText[0]);
+			0, (LPARAM)szComboText[0]);
 		SetDlgItemText(hMainWnd, IDC_IPADDRESS, TEXT("192.168.1.255"));
 		break;
 	case WM_COMMAND:

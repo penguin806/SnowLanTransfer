@@ -17,3 +17,4 @@ BOOL ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine);
 BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath);
 VOID CleanNetwork(INT Sock);
 wchar_t * ANSIToUnicode(const char* str);
+char * UnicodeToANSI(const wchar_t *str);
