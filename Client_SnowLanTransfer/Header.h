@@ -18,3 +18,4 @@ BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath);
 VOID CleanNetwork(INT Sock);
 wchar_t * ANSIToUnicode(const char* str);
 char * UnicodeToANSI(const wchar_t *str);
+VOID AddTrayIcon(HWND hMainWnd, NOTIFYICONDATA *Data, UINT uSize);
