@@ -2,12 +2,9 @@
 #include "Header.h"
 #include "resource.h"
 
-#define BUFFER_LEN 512
-#define OPTION_NUM 3
-
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine, INT iCmdShow)
 {
-	INT Sock;
+	INT Sock, recvSock;
 
 	Sock = InitNetwork();
 	if (Sock == INVALID_SOCKET || Sock == 0)
@@ -17,25 +14,55 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLi
 		return 0;
 	}
 
+	recvSock = InitListenClient();
+	if (Sock == INVALID_SOCKET || Sock == 0)
+	{
+		MessageBox(NULL, TEXT("Cannot Listen Client!"), TEXT("Error"), MB_OK | MB_ICONERROR);
+	}
+
+	SNOWDATA data;
+	ZeroMemory(&data, sizeof(data));
+	data.Sock = Sock;
+	data.recvSock = recvSock;
+
 	DialogBoxParam(hInstance, MAKEINTRESOURCE(IDD_SNOW_MAINWND), NULL, MainWndProc,
-		(LPARAM)Sock);
+		(LPARAM)&data);
 
 	return 0;
 }
 
 INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-	static INT Sock;
+	static SNOWDATA Data;
 	const LPTSTR szComboText[OPTION_NUM] = {
 		TEXT("Send Message"),
 		TEXT("Download File"),
 		TEXT("Execute Command")
 	};
+	static HANDLE hListenClientThread;
 
 	switch (uMsg)
 	{
 	case WM_INITDIALOG:
-		Sock = (INT)lParam;
+		CopyMemory(&Data, (const void *)lParam, sizeof(SNOWDATA));
+		Data.hOutput = GetDlgItem(hMainWnd, IDC_OUTPUT);
+		Data.hFile = CreateLogFile();
+		if (Data.hFile == INVALID_HANDLE_VALUE || Data.hFile == NULL)
+		{
+			MessageBox(hMainWnd, TEXT("Unable to Create Log File"), TEXT("Error"),
+				MB_OK | MB_ICONERROR);
+		}
+
+		hListenClientThread = CreateThread(NULL, 0,
+			ClientMessageProc, (LPVOID)&Data, 0, NULL);
+
+		if (Data.Sock == 0 || Data.recvSock == 0)
+		{
+			MessageBox(NULL, TEXT("Unknown Error"), TEXT("ERROR"),
+				MB_OK | MB_ICONERROR);
+			EndDialog(hMainWnd, 0);
+			return 0;
+		}
 
 		for (int i = 0; i < OPTION_NUM; i++)
 		{
@@ -50,7 +77,17 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		switch (LOWORD(wParam))
 		{
 		case IDCANCEL:
-			CleanNetwork(Sock);
+			if (hListenClientThread)
+			{
+				TerminateThread(hListenClientThread, 0);
+				CloseHandle(hListenClientThread);
+			}
+
+			if (Data.hFile)
+			{
+				CloseHandle(Data.hFile);
+			}
+			CleanNetwork(Data);
 			EndDialog(hMainWnd, 0);
 			break;
 		case IDC_SEND:
@@ -89,15 +126,24 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 			wsprintf(szDataToSend, TEXT("#%.3s#%s"), szComboText[iCurSel], szBuffer);
 
-			BOOL bResult = SendData(Sock, IpAddr, szDataToSend, sizeof(szDataToSend));
+			BOOL bResult = SendData(Data.Sock, IpAddr, szDataToSend, sizeof(szDataToSend));
 			if (bResult == FALSE)
 			{
+				TCHAR szIpAddress[BUFFER_LEN];
+				GetDlgItemText(hMainWnd, IDC_IPADDRESS, szIpAddress, BUFFER_LEN);
+				wsprintf(szBuffer, TEXT("SEND TO %s FAIL:\r\n%s\r\n"), szIpAddress,
+					szDataToSend);
 				MessageBox(hMainWnd, TEXT("FAIL"), TEXT("Error"), MB_OK | MB_ICONERROR);
 			}
 			else
 			{
+				TCHAR szIpAddress[BUFFER_LEN];
+				GetDlgItemText(hMainWnd, IDC_IPADDRESS, szIpAddress, BUFFER_LEN);
+				wsprintf(szBuffer, TEXT("SEND TO %s SUCCESS:\r\n%s\r\n"), szIpAddress,
+					szDataToSend);
 				MessageBox(hMainWnd, TEXT("SUCCEED"), TEXT("Finish"), MB_OK | MB_ICONINFORMATION);
 			}
+			WriteLogToFile(Data.hFile, szBuffer);
 			break;
 		}
 		default:
