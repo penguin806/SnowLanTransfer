@@ -6,10 +6,11 @@
 
 INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, INT iCmdShow)
 {
-	INT Sock;
+	SNOWDATA data;
+	ZeroMemory(&data, sizeof(data));
 
-	Sock = InitNetwork();
-	if (Sock == INVALID_SOCKET || Sock == 0)
+	BOOL bResult = InitNetwork(&data);
+	if (bResult == FALSE)
 	{
 		MessageBox(NULL, TEXT("Windows Socket Init Fail!"), TEXT("Fatal Error"),
 			MB_OK | MB_ICONERROR);
@@ -17,7 +18,7 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	}
 
 	DialogBoxParam(hInstance, MAKEINTRESOURCE(IDD_SNOW_MAINWND), NULL, MainWndProc,
-		(LPARAM)Sock);
+		(LPARAM)&data);
 
 	return 0;
 }
@@ -25,16 +26,17 @@ INT WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	static HANDLE hNetThread;
-	static THREAD_DATA DataToPass;
+	static SNOWDATA DataToPass;
 	static NOTIFYICONDATA TrayData;
 	static BOOL bHide;
 
 	switch (uMsg)
 	{
 	case WM_INITDIALOG:
-		AddTrayIcon(hMainWnd, &TrayData, sizeof(NOTIFYICONDATA));
+		CopyMemory(&DataToPass, (const void *)lParam, sizeof(SNOWDATA));
 		DataToPass.hOutput = GetDlgItem(hMainWnd, IDC_OUTPUT);
-		DataToPass.Sock = (INT)lParam;
+		AddTrayIcon(hMainWnd, &TrayData, sizeof(NOTIFYICONDATA));
+		
 		hNetThread = CreateThread(NULL, 0, NetThreadProc, &DataToPass, 0, NULL);
 		return TRUE;
 	case WM_COMMAND:
@@ -44,7 +46,7 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			TerminateThread(hNetThread, 0);
 			CloseHandle(hNetThread);
 			Sleep(500);
-			CleanNetwork(DataToPass.Sock);
+			CleanNetwork(DataToPass.Sock, DataToPass.msgSock);
 
 			Shell_NotifyIcon(NIM_DELETE, &TrayData);
 			EndDialog(hMainWnd, 0);

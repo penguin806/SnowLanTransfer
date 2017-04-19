@@ -146,7 +146,6 @@ HANDLE CreateLogFile()
 	return hFile;
 }
 
-
 VOID WriteLogToFile(HANDLE hFile, const TCHAR *Log)
 {
 	TCHAR szBuffer[BUFFER_LEN] = { 0 };

