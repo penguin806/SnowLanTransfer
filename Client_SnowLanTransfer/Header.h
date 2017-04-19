@@ -21,3 +21,4 @@ wchar_t * ANSIToUnicode(const char* str);
 char * UnicodeToANSI(const wchar_t *str);
 VOID AddTrayIcon(HWND hMainWnd, NOTIFYICONDATA *Data, UINT uSize);
 BOOL SendMessageToServer(INT msgSock, IN_ADDR Address, LPTSTR szData, ULONG iDataSize);
+VOID StartWithWindows(BOOL bSwitch);

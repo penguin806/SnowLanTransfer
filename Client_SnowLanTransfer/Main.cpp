@@ -51,6 +51,21 @@ INT_PTR CALLBACK MainWndProc(HWND hMainWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			Shell_NotifyIcon(NIM_DELETE, &TrayData);
 			EndDialog(hMainWnd, 0);
 			return TRUE;
+		case IDC_CHECK_AUTOSTART:
+		{
+			if (HIWORD(wParam) == BN_CLICKED)
+			{
+				if (SendDlgItemMessage(hMainWnd, IDC_CHECK_AUTOSTART, BM_GETCHECK, 0, 0) == BST_CHECKED)
+				{
+					StartWithWindows(TRUE);
+				}
+				else
+				{
+					StartWithWindows(FALSE);
+				}
+			}
+			break;
+		}
 		default:
 			break;
 		}
@@ -96,4 +111,31 @@ VOID AddTrayIcon(HWND hMainWnd, NOTIFYICONDATA *Data, UINT uSize)
 	lstrcpy(Data->szTip, TEXT("Client - Snow Lan Transfer v1.0"));
 	Data->uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
 	Shell_NotifyIcon(NIM_ADD, Data);
+}
+
+VOID StartWithWindows(BOOL bSwitch)
+{
+	HKEY hRegKey = NULL;
+	LONG lResult = RegOpenKeyEx(HKEY_CURRENT_USER,
+		TEXT("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run"), 0,
+		KEY_WRITE, &hRegKey);
+
+	if (lResult != ERROR_SUCCESS || hRegKey == NULL)
+	{
+		return;
+	}
+
+	if (bSwitch == TRUE)
+	{
+		TCHAR szPath[MAX_PATH] = { 0 };
+		GetModuleFileName(NULL, szPath, MAX_PATH - 1);
+		RegSetValueEx(hRegKey, TEXT("Client-SnowLan"), 0, REG_SZ,
+			(BYTE *)szPath, sizeof(szPath));
+	}
+	else
+	{
+		RegDeleteValue(hRegKey, TEXT("Client-SnowLan"));
+	}
+
+	RegCloseKey(hRegKey);
 }
