@@ -25,3 +25,4 @@ HANDLE CreateLogFile();
 VOID FormatRecvMessage(HWND hOutput, TCHAR *recvBuffer, INT recvLength, IN_ADDR fromAddr, HANDLE hLogFile);
 VOID WriteLogToFile(HANDLE hFile, const TCHAR *Log);
 wchar_t * ANSIToUnicode(const char* str);
+char * UnicodeToANSI(const wchar_t *str);

@@ -102,7 +102,7 @@ DWORD WINAPI ClientMessageProc(LPVOID lParam)
 VOID FormatRecvMessage(HWND hOutput, TCHAR *recvBuffer, INT recvLength, IN_ADDR fromAddr, HANDLE hLogFile)
 {
 	TCHAR *Buffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * sizeof(TCHAR));
-	TCHAR *szDisplayBuffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * sizeof(TCHAR) * 100);
+	TCHAR *szDisplayBuffer = (TCHAR *)LocalAlloc(LMEM_ZEROINIT, BUFFER_LEN * sizeof(TCHAR) * 200);
 
 	LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddr));
 	wsprintf(Buffer, TEXT("RECV FROM %s:\r\n%s\r\n"), UnicodeIpAddr, recvBuffer);
@@ -154,14 +154,16 @@ VOID WriteLogToFile(HANDLE hFile, const TCHAR *Log)
 	GetLocalTime(&Time);
 
 	wsprintf(szBuffer, TEXT("[%04d-%02d-%02d %02d:%02d:%02d] %s"), Time.wYear,
-		Time.wMonth, Time.wDay, Time.wHour, Time.wMinute, Time.wSecond);
+		Time.wMonth, Time.wDay, Time.wHour, Time.wMinute, Time.wSecond, Log);
 
+	LPSTR asciiLog = UnicodeToANSI(szBuffer);
 	DWORD ActualWritten = 0;
 	if (hFile != INVALID_HANDLE_VALUE && hFile != 0)
 	{
-		WriteFile(hFile, (LPCVOID)szBuffer, lstrlen(szBuffer) * sizeof(TCHAR),
+		WriteFile(hFile, (LPCVOID)asciiLog, lstrlenA(asciiLog),
 			&ActualWritten, NULL);
 	}
+	free(asciiLog);
 }
 
 BOOL SendData(INT Sock, ULONG Address, LPTSTR szData, ULONG iDataSize)
@@ -215,5 +217,15 @@ wchar_t * ANSIToUnicode(const char* str)
 	result = (wchar_t *)malloc((textlen + 1) * sizeof(wchar_t));
 	memset(result, 0, (textlen + 1) * sizeof(wchar_t));
 	MultiByteToWideChar(CP_ACP, 0, str, -1, (LPTSTR)result, textlen);
+	return result;
+}
+char * UnicodeToANSI(const wchar_t *str)
+{
+	char * result;
+	int textlen;
+	textlen = WideCharToMultiByte(CP_ACP, 0, str, -1, NULL, 0, NULL, NULL);
+	result = (char *)malloc((textlen + 1) * sizeof(char));
+	memset(result, 0, sizeof(char) * (textlen + 1));
+	WideCharToMultiByte(CP_ACP, 0, str, -1, result, textlen, NULL, NULL);
 	return result;
 }

@@ -122,7 +122,7 @@ BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_
 		free(UnicodeIpAddr);
 
 		SetWindowText(hOutput, szDisplayBufferB);
-		const LPWSTR msg = L"Message Received\r\n";
+		const LPWSTR msg = L"Message Received";
 		SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
 	}
 	else if (lstrcmp(szType, TEXT("#Dow#")) == 0)
@@ -142,14 +142,15 @@ BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_
 				lstrlen(szDisplayBuffer) * sizeof(TCHAR));
 
 			lstrcat(szDisplayBufferB, szDisplayBuffer);
+			SetWindowText(hOutput, szDisplayBufferB);
 		}
 		else
 		{
 			const LPWSTR msg = L"Download Fail!\r\n";
 			wsprintf(szDisplayBuffer, TEXT("%s%s\r\n"), szDisplayBufferB, msg);
 			SendMessageToServer(msgSock, fromAddress, msg, lstrlenW(msg) * sizeof(WCHAR));
+			SetWindowText(hOutput, szDisplayBuffer);
 		}
-		SetWindowText(hOutput, szDisplayBuffer);
 	}
 	else if (lstrcmp(szType, TEXT("#Exe#")) == 0)
 	{
@@ -161,7 +162,7 @@ BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_
 
 		if (ExecuteCommand(msgSock, fromAddress, hOutput, szBuffer) == TRUE)
 		{
-			const LPWSTR msg = L"Execute Success!\r\n";
+			const LPWSTR msg = L"Execute Success!";
 			GetWindowText(hOutput, szDisplayBufferB, BUFFER_LEN * 100);
 			wsprintf(szDisplayBuffer,
 				TEXT("%s%s\r\n"), szDisplayBufferB, msg);
@@ -170,7 +171,7 @@ BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_
 		}
 		else
 		{
-			const LPWSTR msg = L"Execute Fail!\r\n";
+			const LPWSTR msg = L"Execute Fail!";
 			GetWindowText(hOutput, szDisplayBufferB, BUFFER_LEN * 100);
 			wsprintf(szDisplayBuffer,
 				TEXT("%s%s\r\n"), szDisplayBufferB, msg);
@@ -180,7 +181,7 @@ BOOL ParseData(INT msgSock, HWND hOutput, TCHAR szDataRecv[], UINT RecvSize, IN_
 	}
 	else
 	{
-		const LPWSTR msg = L"Unknown Data\r\n";
+		const LPWSTR msg = L"Unknown Data";
 		LPTSTR UnicodeIpAddr = ANSIToUnicode(inet_ntoa(fromAddress));
 		wsprintf(szDisplayBufferB, TEXT("%s[%s]%s\r\n\r\n"), szDisplayBuffer,
 			UnicodeIpAddr, msg);
